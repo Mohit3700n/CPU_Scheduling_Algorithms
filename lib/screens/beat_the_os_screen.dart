@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart'; // Isolate ke liye
 import 'package:flutter/material.dart';
 
+import '../models/algo_stats.dart';
 import '../models/process.dart';
 import '../models/gantt_block.dart';
 import '../algorithms/fcfs.dart';
@@ -11,13 +12,11 @@ import '../algorithms/srtf.dart';
 import '../algorithms/round_robin.dart';
 import '../widgets/gantt_chart.dart';
 
-// --- TOP-LEVEL ISOLATE FUNCTION ---
 Map<String, dynamic> _computeBattleExecution(Map<String, dynamic> args) {
   List<Process> userQueue = args['userQueue'];
   List<Process> osQueue = args['osQueue'];
   String osAlgo = args['osAlgo'];
 
-  // 1. USER EXECUTION (Non-Preemptive Custom Sequence)
   List<Process> userResults = [];
   List<GanttBlock> userTimeline = [];
   int currentTime = 0;
@@ -38,7 +37,6 @@ Map<String, dynamic> _computeBattleExecution(Map<String, dynamic> args) {
       ..waitingTime = p.waitingTime);
   }
 
-  // 2. OS EXECUTION
   List<Process> osResults = [];
   List<GanttBlock> osTimeline = [];
 
@@ -78,7 +76,6 @@ List<GanttBlock> _convertToBlocks(List<Process> processes) {
   blocks.sort((a, b) => a.startTime.compareTo(b.startTime));
   return blocks;
 }
-// ------------------------------------
 
 class BeatTheOsScreen extends StatefulWidget {
   const BeatTheOsScreen({super.key});
@@ -96,7 +93,6 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
   double serverTemperature = 40.0;
   bool isCalculating = false;
 
-  // Battle State Variables
   bool isBattleMode = false;
   List<Process> userResultProcs = [];
   List<Process> osResultProcs = [];
@@ -105,7 +101,6 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
   double userAvgWT = 0;
   double osAvgWT = 0;
 
-  // Animation & Playback Engine
   final ValueNotifier<int> currentTick = ValueNotifier<int>(0);
   int maxTick = 0;
   Timer? playbackTimer;
@@ -133,7 +128,7 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
   void _startNewGame() {
     playbackTimer?.cancel();
     final random = Random();
-    int processCount = random.nextInt(3) + 4; // 4 to 6 processes to fit screen
+    int processCount = random.nextInt(3) + 4;
 
     List<Process> newProcs = [];
     Set<String> uniqueSignatures = {};
@@ -156,7 +151,6 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
 
     newProcs.sort((a, b) => a.arrivalTime.compareTo(b.arrivalTime));
 
-    // Rename sequentially
     for (int i = 0; i < newProcs.length; i++) {
       newProcs[i] = Process(id: 'P${i + 1}', arrivalTime: newProcs[i].arrivalTime, burstTime: newProcs[i].burstTime);
     }
@@ -177,12 +171,12 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
       serverTemperature = 40.0;
       return;
     }
-    // Simple heuristic for UI temperature (runs quickly on main thread)
+
     double penalty = 0;
     int cTime = 0;
     for (var p in userSequence) {
       if (cTime < p.arrivalTime) {
-        penalty += (p.arrivalTime - cTime) * 15; // Penalty for idle time
+        penalty += (p.arrivalTime - cTime) * 15;
         cTime = p.arrivalTime;
       }
       cTime += p.burstTime;
@@ -220,7 +214,6 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
     List<Process> userCopy = userSequence.map((p) => Process(id: p.id, arrivalTime: p.arrivalTime, burstTime: p.burstTime)).toList();
     List<Process> osCopy = initialProcesses.map((p) => Process(id: p.id, arrivalTime: p.arrivalTime, burstTime: p.burstTime)).toList();
 
-    // Heavy CPU task handled by Isolate
     final result = await compute(_computeBattleExecution, {
       'userQueue': userCopy,
       'osQueue': osCopy,
@@ -270,6 +263,9 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    // Breakpoint defined here
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E2C),
       appBar: AppBar(
@@ -280,25 +276,77 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
           IconButton(icon: const Icon(Icons.refresh, color: Colors.white), onPressed: _startNewGame),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: isCalculating
-            ? const Center(child: CircularProgressIndicator(color: Colors.greenAccent))
-            : isBattleMode
-            ? _buildBattleArena()
-            : _buildSelectionScreen(),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: isCalculating
+              ? const Center(child: CircularProgressIndicator(color: Colors.greenAccent))
+              : isBattleMode
+              ? _buildBattleArena(isMobile)
+              : _buildSelectionScreen(isMobile),
+        ),
       ),
     );
   }
 
   // --- SELECTION SCREEN ---
-  Widget _buildSelectionScreen() {
+  Widget _buildSelectionScreen(bool isMobile) {
     Color heatColor = Colors.greenAccent;
     if (serverTemperature > 60) heatColor = Colors.orangeAccent;
     if (serverTemperature > 90) heatColor = Colors.redAccent;
 
-    return Column(
+    // Extracted column widgets to reuse in Row or Column
+    Widget availableProcessesColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("1. Available Processes", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12)),
+            child: availablePool.isEmpty
+                ? const Center(child: Text("Ready!", style: TextStyle(color: Colors.greenAccent)))
+                : SingleChildScrollView(child: Wrap(spacing: 8, runSpacing: 8, children: availablePool.map((p) => _buildProcessCard(p, true)).toList())),
+          ),
+        ),
+      ],
+    );
+
+    Widget customQueueColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("2. Your Custom Queue", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(border: Border.all(color: heatColor, width: 2), borderRadius: BorderRadius.circular(12)),
+            child: userSequence.isEmpty
+                ? const Center(child: Text("Empty", style: TextStyle(color: Colors.white54)))
+                : SingleChildScrollView(
+              child: Wrap(
+                spacing: 8, runSpacing: 8,
+                children: List.generate(userSequence.length, (index) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text("Rank ${index + 1}", style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                      _buildProcessCard(userSequence[index], false),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -321,64 +369,26 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
           ),
         ),
         const SizedBox(height: 16),
+
+        // FIX: Switch layout based on device width
         Expanded(
-          child: Row(
+          child: isMobile
+              ? Column(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("1. Available Processes", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12)),
-                        child: availablePool.isEmpty
-                            ? const Center(child: Text("Ready!", style: TextStyle(color: Colors.greenAccent)))
-                            : SingleChildScrollView(child: Wrap(spacing: 8, runSpacing: 8, children: availablePool.map((p) => _buildProcessCard(p, true)).toList())),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              Expanded(child: availableProcessesColumn),
+              const SizedBox(height: 16),
+              Expanded(child: customQueueColumn),
+            ],
+          )
+              : Row(
+            children: [
+              Expanded(child: availableProcessesColumn),
               const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("2. Your Custom Queue", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(border: Border.all(color: heatColor, width: 2), borderRadius: BorderRadius.circular(12)),
-                        child: userSequence.isEmpty
-                            ? const Center(child: Text("Empty", style: TextStyle(color: Colors.white54)))
-                            : SingleChildScrollView(
-                          child: Wrap(
-                            spacing: 8, runSpacing: 8,
-                            children: List.generate(userSequence.length, (index) {
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text("Rank ${index + 1}", style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                                  _buildProcessCard(userSequence[index], false),
-                                ],
-                              );
-                            }),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              Expanded(child: customQueueColumn),
             ],
           ),
         ),
+
         const SizedBox(height: 16),
         Center(
           child: ElevatedButton.icon(
@@ -418,44 +428,70 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
   }
 
   // --- LIVE BATTLE ARENA ---
-  Widget _buildBattleArena() {
+  Widget _buildBattleArena(bool isMobile) {
     return ValueListenableBuilder<int>(
       valueListenable: currentTick,
       builder: (context, tick, child) {
         bool battleOver = tick >= maxTick;
 
+        // Top Panel controls
+        Widget statusBanner = battleOver ? _buildResultBanner() : Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12)),
+          child: const Text("BATTLE IN PROGRESS...", textAlign: TextAlign.center, style: TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2)),
+        );
+
+        Widget timeControls = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.greenAccent, size: 36), onPressed: _togglePlayback),
+              IconButton(icon: const Icon(Icons.stop_circle, color: Colors.redAccent, size: 36), onPressed: () { playbackTimer?.cancel(); setState(() => isPlaying = false); currentTick.value = 0; }),
+              const SizedBox(width: 12),
+              Text("Time: $tick ms", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+            ],
+          ),
+        );
+
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // TOP PANEL: Result Banner & Controls
-            Row(
+            // TOP PANEL: Responsive switch
+            isMobile
+                ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [statusBanner, const SizedBox(height: 8), timeControls],
+            )
+                : Row(
               children: [
-                Expanded(
-                  child: battleOver ? _buildResultBanner() : Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12)),
-                    child: const Text("BATTLE IN PROGRESS...", textAlign: TextAlign.center, style: TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                  ),
-                ),
+                Expanded(child: statusBanner),
                 const SizedBox(width: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12)),
-                  child: Row(
-                    children: [
-                      IconButton(icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.greenAccent, size: 36), onPressed: _togglePlayback),
-                      IconButton(icon: const Icon(Icons.stop_circle, color: Colors.redAccent, size: 36), onPressed: () { playbackTimer?.cancel(); setState(() => isPlaying = false); currentTick.value = 0; }),
-                      const SizedBox(width: 12),
-                      Text("Time: $tick ms", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                    ],
-                  ),
-                )
+                timeControls
               ],
             ),
+
             const SizedBox(height: 16),
 
-            // DUAL ARENA
+            // DUAL ARENA: Responsive switch
             Expanded(
-              child: Row(
+              child: isMobile
+              // FIX: Use ListView on mobile to prevent squishing and bounded height for Gantt Chart stability
+                  ? ListView(
+                children: [
+                  SizedBox(
+                      height: 450,
+                      child: _buildSystemArena("YOUR STRATEGY (Human)", userResultProcs, userTimeline, tick, Colors.lightBlueAccent, userAvgWT, battleOver)
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                      height: 450,
+                      child: _buildSystemArena("OS STRATEGY ($osAlgo)", osResultProcs, osTimeline, tick, Colors.redAccent, osAvgWT, battleOver)
+                  ),
+                ],
+              )
+                  : Row(
                 children: [
                   Expanded(child: _buildSystemArena("YOUR STRATEGY (Human)", userResultProcs, userTimeline, tick, Colors.lightBlueAccent, userAvgWT, battleOver)),
                   const SizedBox(width: 16),
@@ -482,7 +518,6 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
     );
   }
 
-  // Modular UI for Both User and OS side
   Widget _buildSystemArena(String title, List<Process> results, List<GanttBlock> timeline, int tick, Color themeColor, double finalAwt, bool showStats) {
     String? activeProcessId;
     for (var block in timeline) {
@@ -589,7 +624,6 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
           const Text("Live Execution Chart", style: TextStyle(color: Colors.white70, fontSize: 12)),
           const SizedBox(height: 8),
 
-          // Gantt Chart Box
           Expanded(
             child: Container(
                 padding: const EdgeInsets.all(8),
@@ -600,14 +634,19 @@ class _BeatTheOsScreenState extends State<BeatTheOsScreen> with SingleTickerProv
             ),
           ),
 
-          // Final Stats
           if (showStats) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(color: themeColor.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
               child: Text("Avg Waiting Time: ${finalAwt.toStringAsFixed(2)} ms", textAlign: TextAlign.center, style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 16)),
-            )
+            ),
+            const SizedBox(height: 5),
+            Text(
+                title.contains('Human') ? AlgoStats.getInfo('UserStrategy') : AlgoStats.getInfo(osAlgo),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic)
+            ),
           ]
         ],
       ),

@@ -7,6 +7,7 @@ import '../algorithms/fcfs.dart';
 import '../algorithms/sjf.dart';
 import '../algorithms/round_robin.dart';
 import '../algorithms/srtf.dart';
+import '../models/algo_stats.dart';
 import '../models/gantt_block.dart';
 import '../models/process.dart';
 import '../widgets/gantt_chart.dart';
@@ -187,6 +188,8 @@ class _SingleAlgoScreenState extends State<SingleAlgoScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 800;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E2C),
       appBar: AppBar(
@@ -194,38 +197,111 @@ class _SingleAlgoScreenState extends State<SingleAlgoScreen> with SingleTickerPr
         backgroundColor: const Color(0xFF2A2D3E),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 2, child: _buildControlPanel()),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 5,
-              child: isCalculating
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
-                  : simulationDone
-                  ? ValueListenableBuilder<int>(
-                valueListenable: currentTick,
-                builder: (context, tick, child) {
-                  return _buildRightPanel(tick);
-                },
-              )
-                  : const Center(child: Text("Add processes and hit CALCULATE", style: TextStyle(color: Colors.white54, fontSize: 18))),
-            ),
-          ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
         ),
       ),
     );
   }
 
-  Widget _buildControlPanel() {
+  Widget _buildDesktopLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 2, child: _buildControlPanel(isMobile: false)),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 5,
+          child: isCalculating
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
+              : simulationDone
+              ? ValueListenableBuilder<int>(
+            valueListenable: currentTick,
+            builder: (context, tick, child) {
+              return _buildRightPanelDesktop(tick);
+            },
+          )
+              : const Center(child: Text("Add processes and hit CALCULATE", style: TextStyle(color: Colors.white54, fontSize: 18))),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRightPanelDesktop(int tick) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 180, child: _buildLiveVisualization(tick)),
+        const SizedBox(height: 16),
+
+        const Text("Live Gantt Chart", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        SizedBox(height: 170, child: _buildAnimatedGanttChart(tick)),
+
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 3, child: _buildAnimatedMetricsTable(tick, isMobile: false)),
+              const SizedBox(width: 16),
+              Expanded(flex: 1, child: _buildDynamicStats(tick, isMobile: false)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildControlPanel(isMobile: true),
+          const SizedBox(height: 16),
+          isCalculating
+              ? const SizedBox(height: 200, child: Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF))))
+              : simulationDone
+              ? ValueListenableBuilder<int>(
+            valueListenable: currentTick,
+            builder: (context, tick, child) {
+              return _buildRightPanelMobile(tick);
+            },
+          )
+              : const SizedBox(height: 200, child: Center(child: Text("Add processes and hit CALCULATE", style: TextStyle(color: Colors.white54, fontSize: 18)))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRightPanelMobile(int tick) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(height: 200, child: _buildLiveVisualization(tick)),
+        const SizedBox(height: 16),
+
+        const Text("Live Gantt Chart", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        SizedBox(height: 170, child: _buildAnimatedGanttChart(tick)),
+        const SizedBox(height: 16),
+
+        _buildAnimatedMetricsTable(tick, isMobile: true),
+        const SizedBox(height: 16),
+        _buildDynamicStats(tick, isMobile: true),
+      ],
+    );
+  }
+
+  Widget _buildControlPanel({required bool isMobile}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButton<String>(
             value: selectedAlgorithm,
@@ -252,9 +328,9 @@ class _SingleAlgoScreenState extends State<SingleAlgoScreen> with SingleTickerPr
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: ElevatedButton(onPressed: isCalculating ? null : _addProcess, child: const Text('Add Process'))),
+              Expanded(child: ElevatedButton(onPressed: isCalculating ? null : _addProcess, child: const FittedBox(fit: BoxFit.scaleDown, child: Text('Add Process')))),
               const SizedBox(width: 8),
-              Expanded(child: ElevatedButton(onPressed: isCalculating ? null : _addRandomProcess, style: ElevatedButton.styleFrom(backgroundColor: Colors.teal), child: const Text('Random'))),
+              Expanded(child: ElevatedButton(onPressed: isCalculating ? null : _addRandomProcess, style: ElevatedButton.styleFrom(backgroundColor: Colors.teal), child: const FittedBox(fit: BoxFit.scaleDown, child: Text('Random')))),
             ],
           ),
           const SizedBox(height: 12),
@@ -265,26 +341,30 @@ class _SingleAlgoScreenState extends State<SingleAlgoScreen> with SingleTickerPr
               onPressed: isCalculating ? null : _runSimulation,
               child: isCalculating
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text('RUN $selectedAlgorithm', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  : Text('RUN $selectedAlgorithm', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
           const Divider(height: 24, color: Colors.white24),
           Text('Queue (${inputProcesses.length})', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
 
-          Expanded(
-            child: ListView.builder(
-              itemCount: inputProcesses.length,
-              itemBuilder: (ctx, i) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(inputProcesses[i].id, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                subtitle: Text('AT: ${inputProcesses[i].arrivalTime} | BT: ${inputProcesses[i].burstTime}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () {
-                  setState(() { inputProcesses.removeAt(i); _resetSimulation(); });
-                }),
-              ),
-            ),
-          )
+          isMobile
+              ? SizedBox(height: 200, child: _buildQueueList())
+              : Expanded(child: _buildQueueList()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQueueList() {
+    return ListView.builder(
+      itemCount: inputProcesses.length,
+      itemBuilder: (ctx, i) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(inputProcesses[i].id, style: const TextStyle(color: Colors.white, fontSize: 14)),
+        subtitle: Text('AT: ${inputProcesses[i].arrivalTime} | BT: ${inputProcesses[i].burstTime}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+        trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () {
+          setState(() { inputProcesses.removeAt(i); _resetSimulation(); });
+        }),
       ),
     );
   }
@@ -295,32 +375,6 @@ class _SingleAlgoScreenState extends State<SingleAlgoScreen> with SingleTickerPr
       style: const TextStyle(color: Colors.white, fontSize: 14),
       keyboardType: TextInputType.number,
       decoration: InputDecoration(labelText: label, labelStyle: const TextStyle(color: Colors.white54, fontSize: 12), filled: true, fillColor: const Color(0xFF1E1E2C), isDense: true),
-    );
-  }
-
-  Widget _buildRightPanel(int tick) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(height: 180, child: _buildLiveVisualization(tick)),
-        const SizedBox(height: 16),
-
-        const Text("Live Gantt Chart", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        SizedBox(height: 170, child: _buildAnimatedGanttChart(tick)),
-        const SizedBox(height: 16),
-
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 3, child: _buildAnimatedMetricsTable(tick)),
-              const SizedBox(width: 16),
-              Expanded(flex: 1, child: _buildDynamicStats(tick)),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
@@ -379,13 +433,13 @@ class _SingleAlgoScreenState extends State<SingleAlgoScreen> with SingleTickerPr
                   },
                 ),
                 const SizedBox(width: 12),
-                Text("Tick: $tick / $maxTick ms", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
+                Text("Tick: $tick / $maxTick ms", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.amber)),
               ],
             ),
             const SizedBox(height: 8),
             Container(
               height: 100,
-              width: 160,
+              width: 140,
               decoration: BoxDecoration(
                 color: activeProcess != null ? Colors.green.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
                 border: Border.all(color: activeProcess != null ? Colors.greenAccent : Colors.grey, width: 2),
@@ -396,37 +450,37 @@ class _SingleAlgoScreenState extends State<SingleAlgoScreen> with SingleTickerPr
                 duration: const Duration(milliseconds: 300),
                 child: activeProcess != null
                     ? ScaleTransition(
-                  key: ValueKey(activeProcess.id),
-                  scale: _pulseAnimation,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      SizedBox(
-                        width: 60, height: 60,
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween<double>(begin: 0.0, end: progress),
-                          duration: const Duration(milliseconds: 1000),
-                          curve: Curves.linear,
-                          builder: (context, value, _) {
-                            return CircularProgressIndicator(
-                              value: value,
-                              color: Colors.greenAccent,
-                              strokeWidth: 4,
-                              backgroundColor: Colors.green.withValues(alpha: 0.1),
-                            );
-                          },
+                    key: ValueKey(activeProcess.id),
+                    scale: _pulseAnimation,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 60, height: 60,
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0.0, end: progress),
+                            duration: const Duration(milliseconds: 1000),
+                            curve: Curves.linear,
+                            builder: (context, value, _) {
+                              return CircularProgressIndicator(
+                                value: value,
+                                color: Colors.greenAccent,
+                                strokeWidth: 4,
+                                backgroundColor: Colors.green.withValues(alpha: 0.1),
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                      _buildAnimatedBox(activeProcess, Colors.greenAccent, size: 45),
-                    ],
-                  )
+                        _buildAnimatedBox(activeProcess, Colors.greenAccent, size: 45),
+                      ],
+                    )
                 )
                     : const Text("CPU IDLE", key: ValueKey("idle"), style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -490,60 +544,88 @@ class _SingleAlgoScreenState extends State<SingleAlgoScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildAnimatedMetricsTable(int tick) {
+  Widget _buildAnimatedMetricsTable(int tick, {required bool isMobile}) {
+    var table = DataTable(
+      headingTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6C63FF)),
+      dataTextStyle: const TextStyle(color: Colors.white),
+      columnSpacing: 24,
+      horizontalMargin: 24,
+      columns: const [
+        DataColumn(label: Text('ID')),
+        DataColumn(label: Text('AT')),
+        DataColumn(label: Text('BT')),
+        DataColumn(label: Text('CT')),
+        DataColumn(label: Text('TAT')),
+        DataColumn(label: Text('WT')),
+      ],
+      rows: resultProcesses.map((p) {
+        bool isCompleted = p.completionTime <= tick;
+        bool isRunning = p.arrivalTime <= tick && !isCompleted;
+
+        return DataRow(
+            color: WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) {
+              if (isCompleted) return Colors.green.withValues(alpha: 0.05);
+              if (isRunning) return Colors.orange.withValues(alpha: 0.05);
+              return null;
+            }),
+            cells: [
+              DataCell(Text(p.id, style: TextStyle(color: isCompleted ? Colors.greenAccent : (isRunning ? Colors.orangeAccent : Colors.white)))),
+              DataCell(Text(p.arrivalTime.toString())),
+              DataCell(Text(p.burstTime.toString())),
+              DataCell(Text(isCompleted ? p.completionTime.toString() : (isRunning ? "..." : "-"))),
+              DataCell(Text(isCompleted ? p.turnaroundTime.toString() : "-")),
+              DataCell(Text(isCompleted ? p.waitingTime.toString() : "-")),
+            ]
+        );
+      }).toList(),
+    );
+
     return Container(
       decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white24))),
             child: const Text("Process Execution Metrics", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
-          Expanded(
-            child: SingleChildScrollView(
-              child: DataTable(
-                headingTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6C63FF)),
-                dataTextStyle: const TextStyle(color: Colors.white),
-                columnSpacing: 20,
-                columns: const [
-                  DataColumn(label: Text('ID')),
-                  DataColumn(label: Text('AT')),
-                  DataColumn(label: Text('BT')),
-                  DataColumn(label: Text('CT')),
-                  DataColumn(label: Text('TAT')),
-                  DataColumn(label: Text('WT')),
-                ],
-                rows: resultProcesses.map((p) {
-                  bool isCompleted = p.completionTime <= tick;
-                  bool isRunning = p.arrivalTime <= tick && !isCompleted;
-
-                  return DataRow(
-                      color: WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) {
-                        if (isCompleted) return Colors.green.withValues(alpha: 0.05);
-                        if (isRunning) return Colors.orange.withValues(alpha: 0.05);
-                        return null;
-                      }),
-                      cells: [
-                        DataCell(Text(p.id, style: TextStyle(color: isCompleted ? Colors.greenAccent : (isRunning ? Colors.orangeAccent : Colors.white)))),
-                        DataCell(Text(p.arrivalTime.toString())),
-                        DataCell(Text(p.burstTime.toString())),
-                        DataCell(Text(isCompleted ? p.completionTime.toString() : (isRunning ? "..." : "-"))),
-                        DataCell(Text(isCompleted ? p.turnaroundTime.toString() : "-")),
-                        DataCell(Text(isCompleted ? p.waitingTime.toString() : "-")),
-                      ]
+          if (isMobile)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                    child: table,
+                  ),
+                );
+              },
+            )
+          else
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                        child: table,
+                      ),
+                    ),
                   );
-                }).toList(),
+                },
               ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildDynamicStats(int tick) {
+  Widget _buildDynamicStats(int tick, {required bool isMobile}) {
     List<Process> finishedProcs = resultProcesses.where((p) => p.completionTime <= tick).toList();
 
     double currentAvgWT = 0.0;
@@ -554,13 +636,47 @@ class _SingleAlgoScreenState extends State<SingleAlgoScreen> with SingleTickerPr
       currentAvgTAT = finishedProcs.fold(0.0, (sum, p) => sum + p.turnaroundTime) / finishedProcs.length;
     }
 
-    return Column(
-      children: [
-        Expanded(child: _buildMetricCard("Avg Wait Time", currentAvgWT, Colors.orangeAccent)),
-        const SizedBox(height: 16),
-        Expanded(child: _buildMetricCard("Avg Turnaround", currentAvgTAT, const Color(0xFF00C9A7))),
-      ],
+    var topCard = _buildMetricCard("Avg Wait Time", currentAvgWT, Colors.orangeAccent);
+    var bottomCard = _buildMetricCard("Avg Turnaround", currentAvgTAT, const Color(0xFF00C9A7));
+    var analysis = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: const Color(0xFF2A2D3E),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white24)
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Analysis of algorithm", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          Divider(color: Colors.white24, height: 16),
+          Text(AlgoStats.getInfo(selectedAlgorithm), style: TextStyle(color: Colors.white70, fontSize: 12)),
+        ],
+      ),
     );
+
+    if (isMobile) {
+      return Column(
+        children: [
+          Row(children: [Expanded(child: topCard), const SizedBox(width: 8), Expanded(child: bottomCard)]),
+          const SizedBox(height: 16),
+          analysis
+        ],
+      );
+    } else {
+      return SingleChildScrollView(
+        child: Column(
+          children: [
+            topCard,
+            const SizedBox(height: 16),
+            bottomCard,
+            const SizedBox(height: 16),
+            analysis
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildAnimatedBox(Process p, Color color, {double size = 60, Key? key}) {

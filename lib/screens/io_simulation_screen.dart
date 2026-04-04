@@ -159,6 +159,8 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E2C),
       appBar: AppBar(
@@ -166,31 +168,57 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
         backgroundColor: const Color(0xFF2A2D3E),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 2, child: _buildControlPanel()),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 5,
-              child: isCalculating
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
-                  : simulationDone
-                  ? ValueListenableBuilder<int>(
-                valueListenable: currentTick,
-                builder: (context, tick, child) => _buildRightPanel(tick),
-              )
-                  : const Center(child: Text("Add processes and hit CALCULATE", style: TextStyle(color: Colors.white54, fontSize: 18))),
-            ),
-          ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
         ),
       ),
     );
   }
 
-  Widget _buildControlPanel() {
+  Widget _buildDesktopLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(flex: 2, child: _buildControlPanel(isMobile: false)),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 5,
+          child: isCalculating
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
+              : simulationDone
+              ? ValueListenableBuilder<int>(
+            valueListenable: currentTick,
+            builder: (context, tick, child) => _buildRightPanelDesktop(tick),
+          )
+              : const Center(child: Text("Add processes and hit CALCULATE", style: TextStyle(color: Colors.white54, fontSize: 18))),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildControlPanel(isMobile: true),
+          const SizedBox(height: 16),
+          isCalculating
+              ? const SizedBox(height: 200, child: Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF))))
+              : simulationDone
+              ? ValueListenableBuilder<int>(
+            valueListenable: currentTick,
+            builder: (context, tick, child) => _buildRightPanelMobile(tick),
+          )
+              : const SizedBox(height: 200, child: Center(child: Text("Add processes and hit CALCULATE", style: TextStyle(color: Colors.white54, fontSize: 18)))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlPanel({required bool isMobile}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(16)),
@@ -215,9 +243,9 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: ElevatedButton(onPressed: isCalculating ? null : _addProcess, child: const Text('Add'))),
+              Expanded(child: ElevatedButton(onPressed: isCalculating ? null : _addProcess, child: const FittedBox(fit: BoxFit.scaleDown, child: Text('Add')))),
               const SizedBox(width: 8),
-              Expanded(child: ElevatedButton(onPressed: isCalculating ? null : _addRandom, style: ElevatedButton.styleFrom(backgroundColor: Colors.teal), child: const Text('Random'))),
+              Expanded(child: ElevatedButton(onPressed: isCalculating ? null : _addRandom, style: ElevatedButton.styleFrom(backgroundColor: Colors.teal), child: const FittedBox(fit: BoxFit.scaleDown, child: Text('Random')))),
             ],
           ),
           const SizedBox(height: 12),
@@ -233,24 +261,29 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
           ),
           const Divider(height: 24, color: Colors.white24),
           Text('Queue (${inputProcesses.length})', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          Expanded(
-            child: ListView.builder(
-              itemCount: inputProcesses.length,
-              itemBuilder: (ctx, i) {
-                var p = inputProcesses[i];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(p.id, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                  subtitle: Text('AT:${p.arrivalTime} | C1:${p.cpuBurst1} | IO:${p.ioBurst} | C2:${p.cpuBurst2}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                  trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () {
-                    setState(() { inputProcesses.removeAt(i); _resetSimulation(); });
-                  }),
-                );
-              },
-            ),
-          )
+
+          isMobile
+              ? SizedBox(height: 200, child: _buildQueueList())
+              : Expanded(child: _buildQueueList()),
         ],
       ),
+    );
+  }
+
+  Widget _buildQueueList() {
+    return ListView.builder(
+      itemCount: inputProcesses.length,
+      itemBuilder: (ctx, i) {
+        var p = inputProcesses[i];
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(p.id, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+          subtitle: Text('AT:${p.arrivalTime} | C1:${p.cpuBurst1} | IO:${p.ioBurst} | C2:${p.cpuBurst2}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () {
+            setState(() { inputProcesses.removeAt(i); _resetSimulation(); });
+          }),
+        );
+      },
     );
   }
 
@@ -263,30 +296,45 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
     );
   }
 
-  Widget _buildRightPanel(int tick) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildTopVisualizer(tick),
-          const SizedBox(height: 12),
-          _buildAnimatedGanttCharts(tick),
-          const SizedBox(height: 12),
-          Row(
+  Widget _buildRightPanelDesktop(int tick) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildTopVisualizer(tick, isMobile: false),
+        const SizedBox(height: 12),
+        _buildAnimatedGanttCharts(tick, isMobile: false),
+        const SizedBox(height: 12),
+        Expanded(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(flex: 3, child: _buildAnimatedMetricsTable(tick)),
+              Expanded(flex: 3, child: _buildAnimatedMetricsTable(tick, isMobile: false)),
               const SizedBox(width: 16),
               Expanded(flex: 1, child: _buildDynamicStats(tick)),
             ],
           ),
-          const SizedBox(height: 24),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildTopVisualizer(int tick) {
+  Widget _buildRightPanelMobile(int tick) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildTopVisualizer(tick, isMobile: true),
+        const SizedBox(height: 16),
+        _buildAnimatedGanttCharts(tick, isMobile: true),
+        const SizedBox(height: 16),
+        _buildAnimatedMetricsTable(tick, isMobile: true),
+        const SizedBox(height: 16),
+        _buildDynamicStats(tick),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildTopVisualizer(int tick, {required bool isMobile}) {
     String? activeCpuId;
     for (var b in cpuTimeline) { if (tick >= b.startTime && tick < b.endTime) { activeCpuId = b.processId; break; } }
 
@@ -321,52 +369,46 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
       }
     }
 
+    Widget cpuBox = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3))),
+      child: Row(
+        children: [
+          _buildPulseBox("CPU", runningCpu, Colors.greenAccent),
+          const SizedBox(width: 12),
+          Expanded(child: _buildQueue("CPU Ready Queue", readyQueue, Colors.orange)),
+        ],
+      ),
+    );
+
+    Widget ioBox = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFF9066).withValues(alpha: 0.3))),
+      child: Row(
+        children: [
+          _buildPulseBox("I/O DEVICE", runningIo, const Color(0xFFFF9066)),
+          const SizedBox(width: 12),
+          Expanded(child: _buildQueue("I/O Wait Queue", ioWaitQueue, Colors.blueAccent)),
+        ],
+      ),
+    );
+
     return Column(
       children: [
-        // Playback & Tick
         Row(
           children: [
             IconButton(icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.greenAccent, size: 36), onPressed: _togglePlayback),
             IconButton(icon: const Icon(Icons.stop_circle, color: Colors.redAccent, size: 36), onPressed: () { playbackTimer?.cancel(); setState(() => isPlaying = false); currentTick.value = 0; }),
             const SizedBox(width: 12),
-            Text("Tick: $tick / $maxTick ms", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
+            Text("Tick: $tick / $maxTick ms", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.amber)),
           ],
         ),
         const SizedBox(height: 8),
 
-        Row(
-          children: [
-            // CPU SYSTEM
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3))),
-                child: Row(
-                  children: [
-                    _buildPulseBox("CPU", runningCpu, Colors.greenAccent),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildQueue("CPU Ready Queue", readyQueue, Colors.orange)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // I/O SYSTEM
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFF9066).withValues(alpha: 0.3))),
-                child: Row(
-                  children: [
-                    _buildPulseBox("I/O DEVICE", runningIo, const Color(0xFFFF9066)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildQueue("I/O Wait Queue", ioWaitQueue, Colors.blueAccent)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+        isMobile
+            ? Column(children: [cpuBox, const SizedBox(height: 12), ioBox])
+            : Row(children: [Expanded(child: cpuBox), const SizedBox(width: 12), Expanded(child: ioBox)]),
+
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
@@ -441,7 +483,7 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
     );
   }
 
-  Widget _buildAnimatedGanttCharts(int tick) {
+  Widget _buildAnimatedGanttCharts(int tick, {required bool isMobile}) {
     List<GanttBlock> getVisible(List<GanttBlock> fullList) {
       List<GanttBlock> visible = [];
       for (var b in fullList) {
@@ -455,96 +497,116 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
     List<GanttBlock> visCpu = getVisible(cpuTimeline);
     List<GanttBlock> visIo = getVisible(ioTimeline);
 
-    return Row(
+    // FIX: Removed the SingleChildScrollView wrap from GanttChartWidget completely.
+    // The Expanded widgets inside GanttChartWidget will naturally scale within the container without crashing.
+    Widget cpuChart = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("CPU Timeline", style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-              Container(
-                height: 150, margin: const EdgeInsets.only(top: 4),
-                decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(8)),
-                child: visCpu.isEmpty ? const Center(child: Text("...", style: TextStyle(color: Colors.white24))) : GanttChartWidget(timeline: visCpu),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("I/O Device Timeline", style: TextStyle(color: Color(0xFFFF9066), fontSize: 12, fontWeight: FontWeight.bold)),
-              Container(
-                height: 150, margin: const EdgeInsets.only(top: 4),
-                decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(8)),
-                child: visIo.isEmpty ? const Center(child: Text("...", style: TextStyle(color: Colors.white24))) : GanttChartWidget(timeline: visIo),
-              ),
-            ],
-          ),
+        const Text("CPU Timeline", style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+        Container(
+          height: 150, margin: const EdgeInsets.only(top: 4),
+          decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(8)),
+          child: visCpu.isEmpty
+              ? const Center(child: Text("...", style: TextStyle(color: Colors.white24)))
+              : GanttChartWidget(timeline: visCpu),
         ),
       ],
     );
+
+    Widget ioChart = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("I/O Device Timeline", style: TextStyle(color: Color(0xFFFF9066), fontSize: 12, fontWeight: FontWeight.bold)),
+        Container(
+          height: 150, margin: const EdgeInsets.only(top: 4),
+          decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(8)),
+          child: visIo.isEmpty
+              ? const Center(child: Text("...", style: TextStyle(color: Colors.white24)))
+              : GanttChartWidget(timeline: visIo),
+        ),
+      ],
+    );
+
+    return isMobile
+        ? Column(children: [cpuChart, const SizedBox(height: 16), ioChart])
+        : Row(children: [Expanded(child: cpuChart), const SizedBox(width: 12), Expanded(child: ioChart)]);
   }
 
-  Widget _buildAnimatedMetricsTable(int tick) {
+  Widget _buildAnimatedMetricsTable(int tick, {required bool isMobile}) {
+    var table = DataTable(
+      headingTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6C63FF)),
+      dataTextStyle: const TextStyle(color: Colors.white),
+      columnSpacing: 16,
+      columns: const [
+        DataColumn(label: Text('ID')),
+        DataColumn(label: Text('AT')),
+        DataColumn(label: Text('CPU')),
+        DataColumn(label: Text('I/O')),
+        DataColumn(label: Text('CT')),
+        DataColumn(label: Text('TAT')),
+        DataColumn(label: Text('WT')),
+      ],
+      rows: resultProcesses.map((p) {
+        bool isCompleted = p.completionTime <= tick;
+        bool isRunning = p.arrivalTime <= tick && !isCompleted;
+
+        return DataRow(
+            color: WidgetStateProperty.resolveWith<Color?>((states) {
+              if (isCompleted) return Colors.green.withValues(alpha: 0.05);
+              if (isRunning) return Colors.orange.withValues(alpha: 0.05);
+              return null;
+            }),
+            cells: [
+              DataCell(Text(p.id, style: TextStyle(color: isCompleted ? Colors.greenAccent : (isRunning ? Colors.orangeAccent : Colors.white)))),
+              DataCell(Text(p.arrivalTime.toString())),
+              DataCell(Text('${p.cpuBurst1 + p.cpuBurst2}')),
+              DataCell(Text(p.ioBurst.toString())),
+              DataCell(Text(isCompleted ? p.completionTime.toString() : (isRunning ? "..." : "-"))),
+              DataCell(Text(isCompleted ? p.turnaroundTime.toString() : "-")),
+              DataCell(Text(isCompleted ? p.waitingTime.toString() : "-")),
+            ]
+        );
+      }).toList(),
+    );
+
     return Container(
       decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white24))),
             child: const Text("Parallel Execution Metrics", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
-
-          LayoutBuilder(
+          isMobile
+              ? LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                    child: DataTable(
-                      headingTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6C63FF)),
-                      dataTextStyle: const TextStyle(color: Colors.white),
-                      columnSpacing: 16,
-                      columns: const [
-                        DataColumn(label: Text('ID')),
-                        DataColumn(label: Text('AT')),
-                        DataColumn(label: Text('CPU')),
-                        DataColumn(label: Text('I/O')),
-                        DataColumn(label: Text('CT')),
-                        DataColumn(label: Text('TAT')),
-                        DataColumn(label: Text('WT')),
-                      ],
-                      rows: resultProcesses.map((p) {
-                        bool isCompleted = p.completionTime <= tick;
-                        bool isRunning = p.arrivalTime <= tick && !isCompleted;
-
-                        return DataRow(
-                            color: WidgetStateProperty.resolveWith<Color?>((states) {
-                              if (isCompleted) return Colors.green.withValues(alpha: 0.05);
-                              if (isRunning) return Colors.orange.withValues(alpha: 0.05);
-                              return null;
-                            }),
-                            cells: [
-                              DataCell(Text(p.id, style: TextStyle(color: isCompleted ? Colors.greenAccent : (isRunning ? Colors.orangeAccent : Colors.white)))),
-                              DataCell(Text(p.arrivalTime.toString())),
-                              DataCell(Text('${p.cpuBurst1 + p.cpuBurst2}')),
-                              DataCell(Text(p.ioBurst.toString())),
-                              DataCell(Text(isCompleted ? p.completionTime.toString() : (isRunning ? "..." : "-"))),
-                              DataCell(Text(isCompleted ? p.turnaroundTime.toString() : "-")),
-                              DataCell(Text(isCompleted ? p.waitingTime.toString() : "-")),
-                            ]
-                        );
-                      }).toList(),
-                    ),
+                    child: table,
                   ),
                 );
               }
+          )
+              : Expanded(
+            child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                        child: table,
+                      ),
+                    ),
+                  );
+                }
+            ),
           ),
         ],
       ),
@@ -560,13 +622,35 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
       currentAvgTAT = finishedProcs.fold(0.0, (sum, p) => sum + p.turnaroundTime) / finishedProcs.length;
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildMetricCard("Avg Wait Time", currentAvgWT, Colors.orangeAccent),
-        const SizedBox(height: 16),
-        _buildMetricCard("Avg Turnaround", currentAvgTAT, const Color(0xFF00C9A7)),
-      ],
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildMetricCard("Avg Wait Time", currentAvgWT, Colors.orangeAccent),
+          const SizedBox(height: 16),
+          _buildMetricCard("Avg Turnaround", currentAvgTAT, const Color(0xFF00C9A7)),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: const Color(0xFF2A2D3E),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24)
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Analysis of algorithm", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                Divider(color: Colors.white24, height: 16),
+                Text("Strategy: Multi-Queue Event Driven", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                SizedBox(height: 4),
+                Text("Time Complexity: O(N log N)", style: TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          )
+        ],
+      ),
     );
   }
 
@@ -588,7 +672,10 @@ class _IoSimulationScreenState extends State<IoSimulationScreen> with SingleTick
         children: [
           Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text("${value.toStringAsFixed(2)} ms", style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
+          FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text("${value.toStringAsFixed(2)} ms", style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold))
+          ),
         ],
       ),
     );

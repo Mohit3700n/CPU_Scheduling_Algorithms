@@ -1,3 +1,4 @@
+import 'package:cpu_scheduling_algorithm/models/algo_stats.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';
 import '../models/process.dart';
@@ -8,7 +9,6 @@ import '../algorithms/srtf.dart';
 import '../algorithms/round_robin.dart';
 import '../widgets/gantt_chart.dart';
 
-// NAYA: Is class me timeline aur processes list add kiya hai
 class BattleResult {
   final String algoName;
   final double avgWT;
@@ -69,7 +69,6 @@ class _BattleModeScreenState extends State<BattleModeScreen> {
     });
   }
 
-  // FCFS aur SJF (Non-Preemptive) ke liye Timeline Generate karne ka function
   List<GanttBlock> _generateTimeline(List<Process> processes) {
     List<GanttBlock> blocks = processes.map((p) {
       return GanttBlock(processId: p.id, startTime: p.completionTime - p.burstTime, endTime: p.completionTime);
@@ -115,7 +114,6 @@ class _BattleModeScreenState extends State<BattleModeScreen> {
     double rrTAT = rrResult.fold(0, (sum, p) => sum + p.turnaroundTime) / rrResult.length;
 
     setState(() {
-      // NAYA: Data save karte time timeline aur result list bhi save ki
       battleResults = [
         BattleResult('FCFS', fcfsWT, fcfsTAT, const Color(0xFF6C63FF), fcfsTimeline, fcfsResult),
         BattleResult('SJF', sjfWT, sjfTAT, const Color(0xFF00C9A7), sjfTimeline, sjfResult),
@@ -123,7 +121,6 @@ class _BattleModeScreenState extends State<BattleModeScreen> {
         BattleResult('RR', rrWT, rrTAT, const Color(0xFFFF9066), rrTimeline, rrResult),
       ];
 
-      // Sort original list temporary for checking winner, but keep real list ordered later
       List<BattleResult> sortedForWinner = List.from(battleResults)..sort((a, b) => a.avgWT.compareTo(b.avgWT));
       winnerText = "${sortedForWinner.first.algoName} Wins! (Lowest Waiting Time: ${sortedForWinner.first.avgWT.toStringAsFixed(2)})";
     });
@@ -131,181 +128,242 @@ class _BattleModeScreenState extends State<BattleModeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E2C),
       appBar: AppBar(
-        title: const Text('Algorithm Battle Mode', style: TextStyle(color: Colors.white),),
+        title: const Text('Algorithm Battle Mode', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF2A2D3E),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // LEFT COLUMN: Input Section (No changes here)
-            Expanded(
-              flex: 1,
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(16)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Process Data', style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(child: _buildTextField('AT', _atController)),
-                        const SizedBox(width: 16),
-                        Expanded(child: _buildTextField('BT', _btController)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField('Time Quantum (For RR)', _tqController),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6C63FF),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: _addProcess,
-                            icon: const Icon(Icons.add, color: Colors.white),
-                            label: const Text('Add', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00C9A7),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: _addRandomProcess,
-                            icon: const Icon(Icons.casino, color: Colors.white),
-                            label: const Text('Random', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    const Text('Battle Queue', style: TextStyle(fontSize: 16, color: Colors.white70)),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: inputProcesses.length,
-                        itemBuilder: (context, index) {
-                          final p = inputProcesses[index];
-                          return Card(
-                            color: const Color(0xFF1E1E2C),
-                            child: ListTile(
-                              title: Text(p.id, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                              subtitle: Text('AT: ${p.arrivalTime} | BT: ${p.burstTime}', style: const TextStyle(color: Colors.white70)),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.redAccent),
-                                onPressed: () {
-                                  setState(() {
-                                    inputProcesses.removeAt(index);
-                                  });
-                                },
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5C8D), padding: const EdgeInsets.symmetric(vertical: 20)),
-                        onPressed: _runBattle,
-                        child: const Text('START BATTLE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 32),
-
-            // RIGHT COLUMN: Results Section
-            Expanded(
-              flex: 2,
-              child: battleResults.isEmpty
-                  ? const Center(child: Text('Add processes and START BATTLE to see comparison.', style: TextStyle(color: Colors.white54, fontSize: 16)))
-              // NAYA: Scroll view lagaya hai taaki lamba list scroll ho sake
-                  : SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF5C8D).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFFF5C8D), width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          "🏆 $winnerText",
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-
-                    // NAYA: Heights fix kar di hain taaki overflow na ho
-                    SizedBox(
-                      height: 380,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              children: [
-                                const Text('Average Waiting Time', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 16),
-                                Expanded(child: _buildComparisonChart(isWT: true)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 32),
-                          Expanded(
-                            child: Column(
-                              children: [
-                                const Text('Average Turnaround Time', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 16),
-                                Expanded(child: _buildComparisonChart(isWT: false)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-                    const Divider(color: Colors.white24, thickness: 2),
-                    const SizedBox(height: 30),
-                    const Text('Detailed Execution Timelines & Metrics', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-                    const SizedBox(height: 32),
-                    ..._buildDetailedResultsList(),
-                    const SizedBox(height: 30),
-                  ],
-                ),
-              ),
-            ),
-          ],
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
+          child: isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
         ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // DESKTOP LAYOUT (Strict layout to fix overflow)
+  // ==========================================
+  Widget _buildDesktopLayout() {
+    return Row(
+      // FIX: 'stretch' gives precise screen height to children.
+      // Prevents SingleChildScrollView from growing infinitely and causing "Bottom Overflow".
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(flex: 1, child: _buildControlPanel(isMobile: false)),
+        const SizedBox(width: 32),
+        Expanded(
+          flex: 2,
+          child: battleResults.isEmpty
+              ? const Center(child: Text('Add processes and START BATTLE to see comparison.', style: TextStyle(color: Colors.white54, fontSize: 16)))
+              : _buildResultsPanel(isMobile: false),
+        ),
+      ],
+    );
+  }
+
+  // ==========================================
+  // MOBILE LAYOUT (Safe Stacked Layout)
+  // ==========================================
+  Widget _buildMobileLayout() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildControlPanel(isMobile: true),
+          const SizedBox(height: 24),
+          battleResults.isEmpty
+              ? const SizedBox(
+            height: 200,
+            child: Center(
+              child: Text(
+                'Add processes and START BATTLE to see comparison.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white54, fontSize: 16),
+              ),
+            ),
+          )
+              : _buildResultsPanel(isMobile: true),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // SHARED WIDGETS
+  // ==========================================
+  Widget _buildControlPanel({required bool isMobile}) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Process Data', style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(child: _buildTextField('AT', _atController)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildTextField('BT', _btController)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildTextField('Time Quantum (For RR)', _tqController),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6C63FF),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _addProcess,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('Add', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00C9A7),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _addRandomProcess,
+                  icon: const Icon(Icons.casino, color: Colors.white),
+                  label: const Text('Random', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          const Text('Battle Queue', style: TextStyle(fontSize: 16, color: Colors.white70)),
+          const SizedBox(height: 8),
+
+          // Strictly limit list height on mobile so it doesn't crash scroll views
+          isMobile
+              ? SizedBox(height: 250, child: _buildQueueList())
+              : Expanded(child: _buildQueueList()),
+
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5C8D), padding: const EdgeInsets.symmetric(vertical: 20)),
+              onPressed: _runBattle,
+              child: const Text('START BATTLE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQueueList() {
+    return ListView.builder(
+      itemCount: inputProcesses.length,
+      itemBuilder: (context, index) {
+        final p = inputProcesses[index];
+        return Card(
+          color: const Color(0xFF1E1E2C),
+          child: ListTile(
+            title: Text(p.id, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            subtitle: Text('AT: ${p.arrivalTime} | BT: ${p.burstTime}', style: const TextStyle(color: Colors.white70)),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete, color: Colors.redAccent),
+              onPressed: () {
+                setState(() {
+                  inputProcesses.removeAt(index);
+                });
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildResultsPanel({required bool isMobile}) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF5C8D).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFFF5C8D), width: 2),
+            ),
+            child: Center(
+              child: Text(
+                "🏆 $winnerText",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ),
+          const SizedBox(height: 40),
+
+          isMobile
+              ? Column(
+            children: [
+              const Text('Average Waiting Time', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              SizedBox(height: 250, child: _buildComparisonChart(isWT: true)),
+              const SizedBox(height: 40),
+              const Text('Average Turnaround Time', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              SizedBox(height: 250, child: _buildComparisonChart(isWT: false)),
+            ],
+          )
+              : SizedBox(
+            height: 380,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text('Average Waiting Time', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      Expanded(child: _buildComparisonChart(isWT: true)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 32),
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text('Average Turnaround Time', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      Expanded(child: _buildComparisonChart(isWT: false)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 30),
+          const Divider(color: Colors.white24, thickness: 2),
+          const SizedBox(height: 30),
+          Text('Detailed Algorithmic Analysis', style: TextStyle(fontSize: isMobile ? 24 : 28, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 32),
+          ..._buildDetailedResultsList(isMobile: isMobile),
+          const SizedBox(height: 30),
+        ],
       ),
     );
   }
@@ -340,7 +398,7 @@ class _BattleModeScreenState extends State<BattleModeScreen> {
       decoration: BoxDecoration(color: const Color(0xFF2A2D3E), borderRadius: BorderRadius.circular(16)),
       child: LayoutBuilder(
           builder: (context, constraints) {
-            double availableHeightForBars = constraints.maxHeight - 80;
+            double availableHeightForBars = constraints.maxHeight - 60;
             if (availableHeightForBars < 0) availableHeightForBars = 0;
 
             return Row(
@@ -350,24 +408,26 @@ class _BattleModeScreenState extends State<BattleModeScreen> {
                 double val = isWT ? result.avgWT : result.avgTAT;
                 double heightRatio = val / maxVal;
 
-                return Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(val.toStringAsFixed(2), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 8),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 800),
-                      curve: Curves.easeOutQuart,
-                      width: 50,
-                      height: availableHeightForBars * heightRatio,
-                      decoration: BoxDecoration(
-                        color: result.color,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                return Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(val.toStringAsFixed(2), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 8),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 800),
+                        curve: Curves.easeOutQuart,
+                        width: 40,
+                        height: availableHeightForBars * heightRatio,
+                        decoration: BoxDecoration(
+                          color: result.color,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(result.algoName, style: const TextStyle(color: Colors.white70, fontSize: 16)),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(result.algoName, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                    ],
+                  ),
                 );
               }).toList(),
             );
@@ -376,16 +436,61 @@ class _BattleModeScreenState extends State<BattleModeScreen> {
     );
   }
 
-  List<Widget> _buildDetailedResultsList() {
+  List<Widget> _buildDetailedResultsList({required bool isMobile}) {
     List<String> order = ['FCFS', 'SJF', 'SRTF', 'RR'];
     List<Widget> sections = [];
 
     for (String algo in order) {
       var res = battleResults.firstWhere((e) => e.algoName == algo);
+
+      Widget header = isMobile
+          ? Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.analytics, color: res.color, size: 36),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(res.algoName, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: res.color)),
+                    const SizedBox(height: 4),
+                    Text(AlgoStats.getInfo(res.algoName), style: const TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text("AWT: ${res.avgWT.toStringAsFixed(2)} ms  |  ATAT: ${res.avgTAT.toStringAsFixed(2)} ms",
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        ],
+      )
+          : Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(Icons.analytics, color: res.color, size: 36),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(res.algoName, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: res.color)),
+              const SizedBox(height: 4),
+              Text(AlgoStats.getInfo(res.algoName), style: const TextStyle(color: Colors.white54, fontSize: 14, fontStyle: FontStyle.italic)),
+            ],
+          ),
+          const Spacer(),
+          Text("AWT: ${res.avgWT.toStringAsFixed(2)} ms  |  ATAT: ${res.avgTAT.toStringAsFixed(2)} ms",
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
+      );
+
       sections.add(
           Container(
             margin: const EdgeInsets.only(bottom: 40),
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.all(isMobile ? 20 : 32),
             decoration: BoxDecoration(
               color: const Color(0xFF2A2D3E),
               borderRadius: BorderRadius.circular(16),
@@ -394,19 +499,12 @@ class _BattleModeScreenState extends State<BattleModeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                    children: [
-                      Icon(Icons.analytics, color: res.color, size: 32),
-                      const SizedBox(width: 16),
-                      Text(res.algoName, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: res.color)),
-                      const Spacer(),
-                      Text("AWT: ${res.avgWT.toStringAsFixed(2)} ms  |  ATAT: ${res.avgTAT.toStringAsFixed(2)} ms",
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    ]
-                ),
+                header,
                 const SizedBox(height: 32),
                 const Text("Execution Timeline (Gantt Chart)", style: TextStyle(color: Colors.white70, fontSize: 16)),
                 const SizedBox(height: 12),
+                // FIX: Removed experimental scroll wrapper.
+                // Render original widget to fix 'Hit Test Zero Size' crash.
                 GanttChartWidget(timeline: res.timeline),
                 const SizedBox(height: 40),
                 const Text("Process Metrics Table", style: TextStyle(color: Colors.white70, fontSize: 16)),
@@ -421,30 +519,43 @@ class _BattleModeScreenState extends State<BattleModeScreen> {
   }
 
   Widget _buildMetricsTable(List<Process> processes, Color themeColor) {
+    var table = DataTable(
+      headingTextStyle: TextStyle(fontWeight: FontWeight.bold, color: themeColor),
+      dataTextStyle: const TextStyle(color: Colors.white70),
+      columnSpacing: 24,
+      columns: const [
+        DataColumn(label: Text('ID')),
+        DataColumn(label: Text('AT')),
+        DataColumn(label: Text('BT')),
+        DataColumn(label: Text('CT')),
+        DataColumn(label: Text('TAT')),
+        DataColumn(label: Text('WT')),
+      ],
+      rows: processes.map((p) {
+        return DataRow(cells: [
+          DataCell(Text(p.id, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white))),
+          DataCell(Text(p.arrivalTime.toString())),
+          DataCell(Text(p.burstTime.toString())),
+          DataCell(Text(p.completionTime.toString())),
+          DataCell(Text(p.turnaroundTime.toString())),
+          DataCell(Text(p.waitingTime.toString(), style: const TextStyle(color: Colors.orangeAccent))),
+        ]);
+      }).toList(),
+    );
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(color: const Color(0xFF1E1E2C), borderRadius: BorderRadius.circular(12)),
-      child: DataTable(
-        headingTextStyle: TextStyle(fontWeight: FontWeight.bold, color: themeColor),
-        dataTextStyle: const TextStyle(color: Colors.white70),
-        columns: const [
-          DataColumn(label: Text('ID')),
-          DataColumn(label: Text('AT')),
-          DataColumn(label: Text('BT')),
-          DataColumn(label: Text('CT')),
-          DataColumn(label: Text('TAT')),
-          DataColumn(label: Text('WT')),
-        ],
-        rows: processes.map((p) {
-          return DataRow(cells: [
-            DataCell(Text(p.id, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white))),
-            DataCell(Text(p.arrivalTime.toString())),
-            DataCell(Text(p.burstTime.toString())),
-            DataCell(Text(p.completionTime.toString())),
-            DataCell(Text(p.turnaroundTime.toString())),
-            DataCell(Text(p.waitingTime.toString(), style: const TextStyle(color: Colors.orangeAccent))),
-          ]);
-        }).toList(),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: table,
+            ),
+          );
+        },
       ),
     );
   }
